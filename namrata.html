@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Namrata's Galentine Game</title>
+
+  <!-- React -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    body {
+      background: linear-gradient(135deg, #fce8f3 0%, #fdf2f8 100%);
+      min-height: 100vh;
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    }
+
+    .title-text {
+      background: linear-gradient(45deg, #ec4899, #db2777);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+    }
+  </style>
+</head>
+
+<body class="p-4">
+  <div class="max-w-4xl mx-auto text-center">
+    <h1 class="text-4xl font-bold mb-4 title-text">Namrata, Will You Be My Galentine?</h1>
+    <p class="text-xl text-pink-600 mb-8">Play a fun game to find out! Catch the love letters...
+    </p>
+    <div id="game-root"></div>
+  </div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useCallback } = React;
+
+    // Create the Heart component since we're not using lucide-react
+    const Heart = ({ className, size = 24 }) => (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width={size}
+        height={size}
+        viewBox="0 0 24 24"
+        fill="currentColor"
+        className={className}
+      >
+        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+      </svg>
+    );
+
+    const ValentineGame = () => {
+      const [gameStarted, setGameStarted] = useState(false);
+      const [gameOver, setGameOver] = useState(false);
+      const [score, setScore] = useState(0);
+      const [playerPosition, setPlayerPosition] = useState(50);
+      const [letters, setLetters] = useState([]);
+      const [obstacles, setObstacles] = useState([]);
+      const [specialLetters, setSpecialLetters] = useState([]);
+      const [collectedI, setCollectedI] = useState(false);
+      const [collectedU, setCollectedU] = useState(false);
+      const [showWinMessage, setShowWinMessage] = useState(false);
+      const [particles, setParticles] = useState([]);
+      const [isPaused, setIsPaused] = useState(false);
+      const [keysPressed, setKeysPressed] = useState(new Set());
+
+      // Game constants
+      const GAME_WIDTH = 800;
+      const GAME_HEIGHT = 600;
+      const PLAYER_WIDTH = 60;
+      const PLAYER_HEIGHT = 60;
+      const LETTER_SIZE = 100;
+      const OBSTACLE_SIZE = 40;
+      const MOVEMENT_SPEED = 2;
+
+      const togglePause = () => {
+        setIsPaused(prev => !prev);
+        setShowWinMessage(prev => !prev);
+      };
+
+      const handleKeyDown = useCallback((e) => {
+        if (!gameStarted || gameOver) return;
+        setKeysPressed(prev => new Set([...prev, e.key]));
+      }, [gameStarted, gameOver]);
+
+      const handleKeyUp = useCallback((e) => {
+        setKeysPressed(prev => {
+          const newKeys = new Set([...prev]);
+          newKeys.delete(e.key);
+          return newKeys;
+        });
+      }, []);
+
+      useEffect(() => {
+        window.addEventListener('keydown', handleKeyDown);
+        window.addEventListener('keyup', handleKeyUp);
+        return () => {
+          window.removeEventListener('keydown', handleKeyDown);
+          window.removeEventListener('keyup', handleKeyUp);
+        };
+      }, [handleKeyDown, handleKeyUp]);
+
+      // Create particle effect
+      const createParticles = () => {
+        const newParticles = [];
+        for (let i = 0; i < 20; i++) {
+          newParticles.push({
+            id: Date.now() + i,
+            x: GAME_WIDTH / 2,
+            y: GAME_HEIGHT / 2,
+            vx: (Math.random() - 0.5) * 10,
+            vy: (Math.random() - 0.5) * 10,
+            life: 100
+          });
+        }
+        setParticles(newParticles);
+      };
+
+      useEffect(() => {
+        if (!gameStarted || gameOver || isPaused) return;
+
+        const moveInterval = setInterval(() => {
+          setPlayerPosition(prev => {
+            let newPos = prev;
+            if (keysPressed.has('ArrowLeft')) {
+              newPos = Math.max(0, prev - MOVEMENT_SPEED);
+            }
+            if (keysPressed.has('ArrowRight')) {
+              newPos = Math.min(100, prev + MOVEMENT_SPEED);
+            }
+            return newPos;
+          });
+        }, 16);
+
+        return () => clearInterval(moveInterval);
+      }, [gameStarted, gameOver, isPaused, keysPressed, MOVEMENT_SPEED]);
+
+      useEffect(() => {
+        if (!gameStarted || gameOver || isPaused) return;
+
+        let lastLetterSpawn = Date.now();
+        let lastObstacleSpawn = Date.now();
+        let lastSpecialLetterSpawn = Date.now();
+
+        const gameLoop = setInterval(() => {
+          const currentTime = Date.now();
+
+          if (collectedI && collectedU && !showWinMessage) {
+            setShowWinMessage(true);
+            setIsPaused(true);
+            createParticles();
+            return;
+          }
+
+          // Move existing letters and obstacles down
+          setLetters(prev => {
+            const updatedLetters = [];
+            for (const letter of prev) {
+              const newY = letter.y + 5;
+              const playerX = (playerPosition / 100) * (GAME_WIDTH - PLAYER_WIDTH);
+              const playerY = GAME_HEIGHT - PLAYER_HEIGHT - 10;
+
+              if (
+                newY + LETTER_SIZE > playerY &&
+                newY < playerY + PLAYER_HEIGHT &&
+                letter.x + LETTER_SIZE > playerX &&
+                letter.x < playerX + PLAYER_WIDTH
+              ) {
+                setScore(prev => prev + 10);
+              } else if (newY < GAME_HEIGHT) {
+                updatedLetters.push({ ...letter, y: newY });
+              }
+            }
+            return updatedLetters;
+          });
+
+          setObstacles(prev => prev.map(obstacle => ({
+            ...obstacle,
+            y: obstacle.y + 5
+          })).filter(obstacle => obstacle.y < GAME_HEIGHT));
+
+          setSpecialLetters(prev => {
+            const updatedSpecialLetters = [];
+            for (const letter of prev) {
+              const newY = letter.y + 2;
+              const playerX = (playerPosition / 100) * (GAME_WIDTH - PLAYER_WIDTH);
+              const playerY = GAME_HEIGHT - PLAYER_HEIGHT - 10;
+
+              if (
+                newY + LETTER_SIZE > playerY &&
+                newY < playerY + PLAYER_HEIGHT &&
+                letter.x + LETTER_SIZE > playerX &&
+                letter.x < playerX + PLAYER_WIDTH
+              ) {
+                if (letter.letter === 'I') setCollectedI(true);
+                if (letter.letter === 'U') setCollectedU(true);
+                setScore(prev => prev + 50);
+              } else if (newY < GAME_HEIGHT) {
+                updatedSpecialLetters.push({ ...letter, y: newY });
+              }
+            }
+            return updatedSpecialLetters;
+          });
+
+          // Update particles
+          setParticles(prev =>
+            prev.map(p => ({
+              ...p,
+              x: p.x + p.vx,
+              y: p.y + p.vy,
+              life: p.life - 1
+            })).filter(p => p.life > 0)
+          );
+
+          // Spawn new letters
+          if (currentTime - lastLetterSpawn >= 1000) {
+            const newLetter = {
+              id: currentTime,
+              x: Math.random() * (GAME_WIDTH - LETTER_SIZE),
+              y: -LETTER_SIZE
+            };
+            setLetters(prev => [...prev, newLetter]);
+            lastLetterSpawn = currentTime;
+          }
+
+          // Spawn obstacles
+          if (currentTime - lastObstacleSpawn >= 8000) {
+            const newObstacle = {
+              id: currentTime,
+              x: Math.random() * (GAME_WIDTH - OBSTACLE_SIZE),
+              y: -OBSTACLE_SIZE
+            };
+            setObstacles(prev => [...prev, newObstacle]);
+            lastObstacleSpawn = currentTime;
+          }
+
+          // Spawn special letters
+          if (currentTime - lastSpecialLetterSpawn >= 10000) {
+            if (!collectedI && !specialLetters.some(l => l.letter === 'I')) {
+              const newI = {
+                id: currentTime,
+                x: Math.random() * (GAME_WIDTH - LETTER_SIZE),
+                y: -LETTER_SIZE,
+                letter: 'I'
+              };
+              setSpecialLetters(prev => [...prev, newI]);
+            }
+            if (!collectedU && !specialLetters.some(l => l.letter === 'U')) {
+              const newU = {
+                id: currentTime + 1,
+                x: Math.random() * (GAME_WIDTH - LETTER_SIZE),
+                y: -LETTER_SIZE,
+                letter: 'U'
+              };
+              setSpecialLetters(prev => [...prev, newU]);
+            }
+            lastSpecialLetterSpawn = currentTime;
+          }
+
+          // Check obstacles collision
+          obstacles.forEach(obstacle => {
+            const playerX = (playerPosition / 100) * (GAME_WIDTH - PLAYER_WIDTH);
+            const playerY = GAME_HEIGHT - PLAYER_HEIGHT - 10;
+
+            if (
+              obstacle.y + OBSTACLE_SIZE > playerY &&
+              obstacle.y < playerY + PLAYER_HEIGHT &&
+              obstacle.x + OBSTACLE_SIZE > playerX &&
+              obstacle.x < playerX + PLAYER_WIDTH
+            ) {
+              setGameOver(true);
+            }
+          });
+        }, 16);
+
+        return () => clearInterval(gameLoop);
+      }, [gameStarted, gameOver, showWinMessage, collectedI, collectedU, playerPosition, isPaused]);
+
+      const startGame = () => {
+        setGameStarted(true);
+        setGameOver(false);
+        setShowWinMessage(false);
+        setIsPaused(false);
+        setScore(0);
+        setPlayerPosition(50);
+        setLetters([]);
+        setObstacles([]);
+        setSpecialLetters([]);
+        setCollectedI(false);
+        setCollectedU(false);
+        setParticles([]);
+      };
+
+      return (
+        <div className="w-full max-w-4xl mx-auto p-4">
+          <div className="text-center mb-4">
+            <h2 className="text-2xl font-bold text-pink-600 mb-2">Love Letter Catcher</h2>
+            <p className="text-lg">Score: {score}</p>
+          </div>
+
+          <div
+            className="relative bg-pink-50 border-4 border-pink-200 rounded-lg overflow-hidden"
+            style={{ width: GAME_WIDTH, height: GAME_HEIGHT, margin: '0 auto' }}
+          >
+            {/* Pause Button - only visible after collecting I and U */}
+            {gameStarted && !gameOver && collectedI && collectedU && (
+              <button
+                onClick={togglePause}
+                className="absolute top-4 right-4 z-10 px-4 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition-colors"
+              >
+                {isPaused ? 'Resume' : 'Pause'}
+              </button>
+            )}
+
+            {!gameStarted && !gameOver && !showWinMessage && (
+              <div className="absolute inset-0 flex items-center justify-center bg-pink-100 bg-opacity-90">
+                <button
+                  onClick={startGame}
+                  className="px-6 py-3 bg-pink-500 text-white rounded-lg text-xl hover:bg-pink-600 transition-colors"
+                >
+                  Start Game
+                </button>
+              </div>
+            )}
+
+            {gameOver && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-pink-100 bg-opacity-90">
+                <h2 className="text-3xl font-bold text-pink-600 mb-4">Game Over!</h2>
+                <p className="text-xl mb-4">Final Score: {score}</p>
+                <button
+                  onClick={startGame}
+                  className="px-6 py-3 bg-pink-500 text-white rounded-lg text-xl hover:bg-pink-600 transition-colors"
+                >
+                  Play Again
+                </button>
+              </div>
+            )}
+
+            {showWinMessage && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-pink-100 bg-opacity-90">
+                <h2 className="text-3xl font-bold text-pink-600 mb-4">
+                  I <Heart className="inline-block text-red-500 animate-bounce" size={40} /> U!
+                </h2>
+                <p className="text-2xl mb-4">Will you be my Galentine's?</p>
+                <div className="flex gap-4">
+                  <button
+                    onClick={() => {
+                      setShowWinMessage(false);
+                      setIsPaused(false);
+                      if (collectedI && collectedU) {
+                        setCollectedI(false);
+                        setCollectedU(false);
+                      }
+                    }}
+                    className="px-6 py-3 bg-pink-500 text-white rounded-lg text-xl hover:bg-pink-600 transition-colors"
+                  >
+                    Continue Playing
+                  </button>
+                  <button
+                    onClick={startGame}
+                    className="px-6 py-3 bg-pink-400 text-white rounded-lg text-xl hover:bg-pink-500 transition-colors"
+                  >
+                    Restart Game
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Player */}
+            <div
+              className="absolute bottom-2 transition-all duration-100"
+              style={{
+                left: `${playerPosition}%`,
+                transform: 'translateX(-50%)',
+                width: PLAYER_WIDTH,
+                height: PLAYER_HEIGHT,
+              }}
+            >
+              <Heart className="w-full h-full text-pink-500" />
+            </div>
+
+            {/* Regular Letters */}
+            {letters.map(letter => (
+              <div
+                key={letter.id}
+                className="absolute"
+                style={{
+                  left: letter.x,
+                  top: letter.y,
+                  width: LETTER_SIZE,
+                  height: LETTER_SIZE,
+                }}
+              >
+                💌
+              </div>
+            ))}
+
+            {/* Special Letters */}
+            {specialLetters.map(letter => (
+              <div
+                key={letter.id}
+                className="absolute flex items-center justify-center text-4xl font-bold text-pink-600"
+                style={{
+                  left: letter.x,
+                  top: letter.y,
+                  width: LETTER_SIZE,
+                  height: LETTER_SIZE,
+                }}
+              >
+                {letter.letter}
+              </div>
+            ))}
+
+            {/* Obstacles */}
+            {obstacles.map(obstacle => (
+              <div
+                key={obstacle.id}
+                className="absolute"
+                style={{
+                  left: obstacle.x,
+                  top: obstacle.y,
+                  width: OBSTACLE_SIZE,
+                  height: OBSTACLE_SIZE,
+                }}
+              >
+                💔
+              </div>
+            ))}
+
+            {/* Particles */}
+            {particles.map(particle => (
+              <Heart
+                key={particle.id}
+                className="absolute text-red-500"
+                style={{
+                  left: particle.x,
+                  top: particle.y,
+                  width: 20,
+                  height: 20,
+                  opacity: particle.life / 100,
+                }}
+              />
+            ))}
+          </div>
+
+          <div className="text-center mt-4">
+            <p className="text-gray-600">
+              Use the left and right arrow keys to move. Catch love letters (💌) and special letters, but avoid broken hearts (💔)!
+            </p>
+            <p lassName="text-gray-600 p-4">
+              Also this game is kinda buggy, so if nothing appears for a while stop moving the heart and things should start appearing!
+              Sorry pooks!</p>
+          </div>
+        </div>
+      );
+    };
+
+    // Mount the game
+    const root = ReactDOM.createRoot(document.getElementById('game-root'));
+    root.render(<ValentineGame />);
+  </script>
+</body>
+
+</html>

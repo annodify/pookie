@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Valentine's Day Special</title>
+    <style>
+        body {
+            background-color: #ffe6f2;
+            text-align: center;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .button {
+            background-color: #ff80bf;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 10px;
+            font-size: 18px;
+            cursor: pointer;
+            margin: 20px;
+            transition: background-color 0.3s ease;
+        }
+
+        .button:hover {
+            background-color: #ff4d94;
+            transform: scale(1.05);
+        }
+
+        #heartCanvas {
+            margin-top: 20px;
+            max-width: 100%;
+        }
+
+        .content-wrapper {
+            z-index: 1;
+            position: relative;
+        }
+
+        .heart-container {
+            position: relative;
+            width: 300px;
+            height: 300px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="content-wrapper">
+        <h1>Happy Valentine's Day!</h1>
+        <p>Choose your special activity:</p>
+        <button class="button" onclick="location.href='namrata.html'">Namrata</button>
+        <button class="button" onclick="location.href='shahana.html'">Shahana</button>
+    </div>
+    <div class="heart-container">
+        <canvas id="heartCanvas"></canvas>
+    </div>
+
+    <script>
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.originalX = x;
+                this.originalY = y;
+                this.vx = 0;
+                this.vy = 0;
+                this.color = color;
+                this.friction = 0.15;
+                this.mass = 40;
+                this.radius = 2;
+            }
+
+            update(mouseX, mouseY, force) {
+                const dx = mouseX - this.x;
+                const dy = mouseY - this.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance < 100) {
+                    const angle = Math.atan2(dy, dx);
+                    const fx = Math.cos(angle) * force;
+                    const fy = Math.sin(angle) * force;
+                    this.vx -= fx / this.mass;
+                    this.vy -= fy / this.mass;
+                }
+
+                // Return to original position
+                const homeX = this.originalX - this.x;
+                const homeY = this.originalY - this.y;
+                this.vx += homeX * 0.05;
+                this.vy += homeY * 0.05;
+
+                // Apply friction
+                this.vx *= (1 - this.friction);
+                this.vy *= (1 - this.friction);
+
+                // Update position
+                this.x += this.vx;
+                this.y += this.vy;
+            }
+
+            draw(ctx) {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+            }
+        }
+
+        class HeartAnimation {
+            constructor() {
+                this.canvas = document.getElementById('heartCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.particles = [];
+                this.mouseX = 0;
+                this.mouseY = 0;
+                this.isMouseDown = false;
+
+                this.resize();
+                this.setupParticles();
+                this.addEventListeners();
+                this.animate();
+            }
+
+            resize() {
+                this.canvas.width = 300;
+                this.canvas.height = 300;
+            }
+
+            setupParticles() {
+                const heartShape = (x, y, size) => {
+                    const t = x / size;
+                    const px = 16 * Math.pow(Math.sin(t), 3);
+                    const py = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t));
+                    return {
+                        x: px * size / 16 + this.canvas.width / 2,
+                        y: py * size / 16 + this.canvas.height / 2
+                    };
+                };
+
+                for (let i = 0; i < 1000; i++) {
+                    const t = (i / 1000) * Math.PI * 2;
+                    const pos = heartShape(t, 0, 8);
+                    this.particles.push(new Particle(pos.x, pos.y, '#ff0000'));
+                }
+            }
+
+            addEventListeners() {
+                this.canvas.addEventListener('mousemove', (e) => {
+                    const rect = this.canvas.getBoundingClientRect();
+                    this.mouseX = e.clientX - rect.left;
+                    this.mouseY = e.clientY - rect.top;
+                });
+
+                this.canvas.addEventListener('mousedown', () => {
+                    this.isMouseDown = true;
+                });
+
+                this.canvas.addEventListener('mouseup', () => {
+                    this.isMouseDown = false;
+                });
+
+                this.canvas.addEventListener('mouseleave', () => {
+                    this.isMouseDown = false;
+                });
+
+                // Touch events
+                this.canvas.addEventListener('touchmove', (e) => {
+                    e.preventDefault();
+                    const rect = this.canvas.getBoundingClientRect();
+                    this.mouseX = e.touches[0].clientX - rect.left;
+                    this.mouseY = e.touches[0].clientY - rect.top;
+                });
+
+                this.canvas.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    this.isMouseDown = true;
+                });
+
+                this.canvas.addEventListener('touchend', () => {
+                    this.isMouseDown = false;
+                });
+            }
+
+            animate() {
+                this.ctx.fillStyle = 'rgb(31, 31, 31)';
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+                const force = this.isMouseDown ? 50 : 6;
+
+                this.particles.forEach(particle => {
+                    particle.update(this.mouseX, this.mouseY, force);
+                    particle.draw(this.ctx);
+                });
+
+                requestAnimationFrame(() => this.animate());
+            }
+        }
+
+        // Start the animation when the page loads
+        window.addEventListener('load', () => {
+            new HeartAnimation();
+        });
+    </script>
+</body>
+
+</html>
