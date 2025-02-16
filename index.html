@@ -18,16 +18,20 @@
             align-items: center;
         }
 
+        h1 {
+            margin-bottom: 10px;
+        }
+
         .button {
             background-color: #ff80bf;
             color: white;
             padding: 15px 30px;
             border: none;
-            border-radius: 10px;
+            border-radius: 25px;
             font-size: 18px;
             cursor: pointer;
             margin: 20px;
-            transition: background-color 0.3s ease;
+            transition: all 0.3s ease;
         }
 
         .button:hover {
@@ -47,8 +51,8 @@
 
         .heart-container {
             position: relative;
-            width: 300px;
-            height: 300px;
+            width: 400px;
+            height: 400px;
             margin-top: 20px;
         }
     </style>
@@ -77,7 +81,7 @@
                 this.color = color;
                 this.friction = 0.15;
                 this.mass = 40;
-                this.radius = 2;
+                this.radius = 1.5;
             }
 
             update(mouseX, mouseY, force) {
@@ -132,63 +136,73 @@
             }
 
             resize() {
-                this.canvas.width = 300;
-                this.canvas.height = 300;
+                this.canvas.width = 400;
+                this.canvas.height = 400;
             }
 
             setupParticles() {
-                const heartShape = (x, y, size) => {
-                    const t = x / size;
-                    const px = 16 * Math.pow(Math.sin(t), 3);
-                    const py = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t));
-                    return {
-                        x: px * size / 16 + this.canvas.width / 2,
-                        y: py * size / 16 + this.canvas.height / 2
-                    };
+                // Function to generate heart shape points
+                const generateHeartPoints = (numPoints, size, noise) => {
+                    const points = [];
+                    const centerX = this.canvas.width / 2;
+                    const centerY = this.canvas.height / 2;
+
+                    for (let i = 0; i < numPoints; i++) {
+                        const t = (i / numPoints) * 2 * Math.PI;
+                        const x = 16 * Math.pow(Math.sin(t), 3);
+                        const y = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t));
+
+                        // Add some random variation
+                        const randX = (Math.random() - 0.5) * noise;
+                        const randY = (Math.random() - 0.5) * noise;
+
+                        points.push({
+                            x: centerX + (x * size + randX),
+                            y: centerY + (y * size + randY)
+                        });
+                    }
+                    return points;
                 };
 
-                for (let i = 0; i < 1000; i++) {
-                    const t = (i / 1000) * Math.PI * 2;
-                    const pos = heartShape(t, 0, 8);
-                    this.particles.push(new Particle(pos.x, pos.y, '#ff0000'));
-                }
+                // Generate multiple layers of particles with different sizes and noise levels
+                const layers = [
+                    { points: 2000, size: 8, noise: 8 },
+                    { points: 2000, size: 7.5, noise: 10 },
+                    { points: 1000, size: 7, noise: 12 }
+                ];
+
+                layers.forEach(layer => {
+                    const points = generateHeartPoints(layer.points, layer.size, layer.noise);
+                    points.forEach(point => {
+                        this.particles.push(new Particle(point.x, point.y, '#ff0000'));
+                    });
+                });
             }
 
             addEventListeners() {
-                this.canvas.addEventListener('mousemove', (e) => {
+                const updateMousePosition = (e, touch = false) => {
                     const rect = this.canvas.getBoundingClientRect();
-                    this.mouseX = e.clientX - rect.left;
-                    this.mouseY = e.clientY - rect.top;
-                });
+                    const x = touch ? e.touches[0].clientX : e.clientX;
+                    const y = touch ? e.touches[0].clientY : e.clientY;
+                    this.mouseX = x - rect.left;
+                    this.mouseY = y - rect.top;
+                };
 
-                this.canvas.addEventListener('mousedown', () => {
-                    this.isMouseDown = true;
-                });
+                this.canvas.addEventListener('mousemove', e => updateMousePosition(e));
+                this.canvas.addEventListener('mousedown', () => this.isMouseDown = true);
+                this.canvas.addEventListener('mouseup', () => this.isMouseDown = false);
+                this.canvas.addEventListener('mouseleave', () => this.isMouseDown = false);
 
-                this.canvas.addEventListener('mouseup', () => {
-                    this.isMouseDown = false;
-                });
-
-                this.canvas.addEventListener('mouseleave', () => {
-                    this.isMouseDown = false;
-                });
-
-                // Touch events
-                this.canvas.addEventListener('touchmove', (e) => {
+                this.canvas.addEventListener('touchmove', e => {
                     e.preventDefault();
-                    const rect = this.canvas.getBoundingClientRect();
-                    this.mouseX = e.touches[0].clientX - rect.left;
-                    this.mouseY = e.touches[0].clientY - rect.top;
+                    updateMousePosition(e, true);
                 });
-
-                this.canvas.addEventListener('touchstart', (e) => {
+                this.canvas.addEventListener('touchstart', e => {
                     e.preventDefault();
                     this.isMouseDown = true;
+                    updateMousePosition(e, true);
                 });
-
-                this.canvas.addEventListener('touchend', () => {
-                    this.isMouseDown = false;
-                });
+                this.canvas.addEventListener('touchend', () => this.isMouseDown = false);
             }
 
             animate() {
